@@ -33,39 +33,19 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
   };
 
   return (
-    <div className="app-card glass-panel">
-      <div className="app-header">
-        <div className="app-title-group">
-          <div className="app-icon">
-            {app.icon.startsWith('data:image/') ? (
-              <img src={app.icon} alt={app.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-            ) : (
-              app.icon
-            )}
-          </div>
-          <div className="app-info">
-            <h3 title={app.id}>{app.name || app.id}</h3>
-            <span className="app-type-badge">{app.type}</span>
-          </div>
+    <div className="app-card glass-panel" style={{ display: 'flex', flexDirection: 'column', padding: '1.5rem', gap: '1.25rem' }}>
+      <div className="app-header" style={{ display: 'flex', gap: '1.25rem', alignItems: 'center' }}>
+        <div className="app-icon" style={{ width: '64px', height: '64px', flexShrink: 0, borderRadius: '16px' }}>
+          {app.icon.startsWith('data:image/') ? (
+            <img src={app.icon} alt={app.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+          ) : (
+            app.icon
+          )}
         </div>
-        {app.type !== 'Native' ? (
-          <button
-            className="mini-launch-btn"
-            title="Launch Application"
-            onClick={() => handleLaunch(app.id, app.type)}
-            disabled={launchingAppId === app.id}
-          >
-            <Play size={16} />
-          </button>
-        ) : (
-          <button
-            className="mini-launch-btn"
-            title="Create Desktop Shortcut"
-            onClick={() => setShowShortcutModal(true)}
-          >
-            <ExternalLink size={16} />
-          </button>
-        )}
+        <div className="app-info" style={{ overflow: 'hidden', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+          <h3 title={app.name || app.id} style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', margin: 0, fontSize: '1.25rem' }}>{app.name || app.id}</h3>
+          <div><span className="app-type-badge">{app.type}</span></div>
+        </div>
       </div>
 
       {showShortcutModal && (
@@ -80,57 +60,114 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
         className="permissions-panel" 
         style={{ 
           display: 'flex', 
-          justifyContent: 'space-between', 
+          gap: '0.5rem', 
+          flexWrap: 'wrap', 
           alignItems: 'center', 
-          marginTop: 'auto',
-          background: 'rgba(0, 0, 0, 0.25)',
+          background: 'rgba(0, 0, 0, 0.2)',
           border: '1px solid rgba(255, 255, 255, 0.05)',
-          borderRadius: '8px',
-          padding: '0.4rem 0.6rem',
-          minHeight: '36px'
+          borderRadius: '12px',
+          padding: '0.75rem',
+          minHeight: '48px'
         }}
       >
-        <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap', flex: 1, alignItems: 'center' }}>
-          {app.permissions.network && <span title="Network Access"><Globe size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.fsHome && <span title="Home Folder"><Home size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.fsHost && <span title="System Files"><HardDrive size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.audioOutput && <span title="Audio Playback"><Volume2 size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.camera && <span title="Camera"><Camera size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.microphone && <span title="Microphone"><Mic size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.display && <span title="Display (X11/Wayland)"><Monitor size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.gpu && <span title="GPU Acceleration"><Cpu size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.dbus && <span title="D-Bus Access"><Activity size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          {app.permissions.virtualization && <span title="Virtualization (KVM)"><Server size={14} style={{ color: 'var(--text-secondary)' }} /></span>}
-          
-          {!(app.permissions.network || app.permissions.fsHome || app.permissions.fsHost || app.permissions.audioOutput || app.permissions.camera || app.permissions.microphone || app.permissions.display || app.permissions.gpu || app.permissions.dbus || app.permissions.virtualization) && (
-            <span style={{ fontSize: '0.75rem', color: 'rgba(255,255,255,0.3)', fontStyle: 'italic' }}>Default</span>
-          )}
-        </div>
+        {app.permissions.network && <span title="Network Access"><Globe size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.fsHome && <span title="Home Folder"><Home size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.fsHost && <span title="System Files"><HardDrive size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.audioOutput && <span title="Audio Playback"><Volume2 size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.camera && <span title="Camera"><Camera size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.microphone && <span title="Microphone"><Mic size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.display && <span title="Display (X11/Wayland)"><Monitor size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.gpu && <span title="GPU Acceleration"><Cpu size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.dbus && <span title="D-Bus Access"><Activity size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
+        {app.permissions.virtualization && <span title="Virtualization (KVM)"><Server size={18} style={{ color: 'rgba(255,255,255,0.75)' }} /></span>}
         
+        {!(app.permissions.network || app.permissions.fsHome || app.permissions.fsHost || app.permissions.audioOutput || app.permissions.camera || app.permissions.microphone || app.permissions.display || app.permissions.gpu || app.permissions.dbus || app.permissions.virtualization) && (
+          <span style={{ fontSize: '0.85rem', color: 'rgba(255,255,255,0.6)', fontStyle: 'italic', paddingLeft: '0.25rem' }}>No special permissions active</span>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: 'auto', paddingTop: '0.5rem' }}>
         <button 
-          className="settings-btn" 
           onClick={() => setShowPermissionsModal(true)}
-          title="Manage Permissions"
+          title="Manage App"
           style={{ 
-            background: 'rgba(255,255,255,0.05)', 
+            flex: app.type === 'Native' ? '1 1 100%' : '1',
+            background: 'var(--accent-color)', 
             border: 'none', 
-            color: 'var(--text-primary)', 
+            color: 'white', 
             borderRadius: '6px', 
-            padding: '0.3rem 0.6rem', 
+            padding: '0.75rem', 
             cursor: 'pointer', 
             display: 'flex', 
             alignItems: 'center', 
-            gap: '0.3rem', 
-            marginLeft: '0.5rem', 
+            justifyContent: 'center',
+            gap: '0.4rem', 
             transition: 'all 0.2s', 
-            fontSize: '0.75rem', 
+            fontSize: '1rem', 
             fontWeight: 600,
-            flexShrink: 0
+            margin: 0
           }}
-          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-color)'; e.currentTarget.style.color = 'white'; }}
-          onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--accent-hover)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--accent-color)'; }}
         >
-          <Settings size={14} /> <span>Manage</span>
+          <Settings size={18} /> Manage
+        </button>
+
+        {app.type === 'Native' && (
+          <button 
+            onClick={() => setShowShortcutModal(true)}
+            title="Create Sandbox Shortcut"
+            style={{ 
+              flex: 1,
+              background: 'rgba(255,255,255,0.08)', 
+              border: 'none', 
+              color: 'var(--text-primary)', 
+              borderRadius: '6px', 
+              padding: '0.75rem', 
+              cursor: 'pointer', 
+              display: 'flex', 
+              alignItems: 'center', 
+              justifyContent: 'center',
+              gap: '0.4rem', 
+              transition: 'all 0.2s', 
+              fontSize: '1rem', 
+              fontWeight: 600,
+              margin: 0
+            }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+          >
+            <Monitor size={18} /> Shortcut
+          </button>
+        )}
+        
+        <button 
+          onClick={() => handleLaunch(app.id, app.type)}
+          disabled={launchingAppId === app.id}
+          title="Launch App directly"
+          style={{ 
+            flex: app.type === 'Native' ? 1 : '0 1 auto',
+            minWidth: app.type === 'Native' ? 'auto' : '100px',
+            background: 'rgba(255,255,255,0.08)', 
+            border: 'none', 
+            color: 'var(--text-primary)', 
+            borderRadius: '6px', 
+            padding: '0.75rem', 
+            cursor: launchingAppId === app.id ? 'not-allowed' : 'pointer', 
+            display: 'flex', 
+            alignItems: 'center', 
+            justifyContent: 'center',
+            gap: '0.4rem', 
+            transition: 'all 0.2s', 
+            fontSize: '1rem', 
+            fontWeight: 600,
+            margin: 0,
+            opacity: launchingAppId === app.id ? 0.6 : 1
+          }}
+          onMouseEnter={(e) => { if (launchingAppId !== app.id) e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
+          onMouseLeave={(e) => { if (launchingAppId !== app.id) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+        >
+          <Play size={18} /> {app.type === 'Native' ? "Launch" : (launchingAppId === app.id ? "Launching..." : "Launch")}
         </button>
       </div>
 
@@ -139,23 +176,9 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
           app={app}
           onClose={() => setShowPermissionsModal(false)}
           handleTogglePermission={handleTogglePermission}
+          onOpenShortcut={() => setShowShortcutModal(true)}
+          handleRemove={handleRemove}
         />
-      )}
-
-      {app.type === 'Native' && (
-        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
-          <button
-            className="launch-btn"
-            onClick={() => handleLaunch(app.id, app.type)}
-            style={{ flex: 1, margin: 0 }}
-            disabled={launchingAppId === app.id}
-          >
-            <Play size={16} /> {launchingAppId === app.id ? "Launching..." : "Launch"}
-          </button>
-          <button className="remove-btn" onClick={() => handleRemove(app.id)}>
-            <Trash size={16} /> Remove
-          </button>
-        </div>
       )}
     </div>
   );

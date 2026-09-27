@@ -1,4 +1,4 @@
-import { Globe, HardDrive, Camera, Mic, Monitor, Cpu, Activity, Home, Volume2, Server, X } from 'lucide-react';
+import { Globe, HardDrive, Camera, Mic, Monitor, Cpu, Activity, Home, Volume2, Server, X, Trash } from 'lucide-react';
 import { createPortal } from 'react-dom';
 import { core } from '../../wailsjs/go/models';
 
@@ -6,9 +6,11 @@ interface PermissionsModalProps {
   app: core.AppModel;
   onClose: () => void;
   handleTogglePermission: (id: string, type: string, perm: keyof core.Permissions, currentVal: boolean) => void;
+  onOpenShortcut?: () => void;
+  handleRemove?: (id: string) => void;
 }
 
-export function PermissionsModal({ app, onClose, handleTogglePermission }: PermissionsModalProps) {
+export function PermissionsModal({ app, onClose, handleTogglePermission, onOpenShortcut, handleRemove }: PermissionsModalProps) {
   return createPortal(
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content permissions-modal-content" onClick={e => e.stopPropagation()}>
@@ -18,7 +20,7 @@ export function PermissionsModal({ app, onClose, handleTogglePermission }: Permi
             <X size={20} />
           </button>
         </div>
-        
+
         <div className="permissions-list" style={{ maxHeight: '60vh', overflowY: 'auto', paddingRight: '0.5rem' }}>
           <div className="permission-item">
             <div className="permission-info">
@@ -131,8 +133,24 @@ export function PermissionsModal({ app, onClose, handleTogglePermission }: Permi
           </div>
         </div>
 
-        <div className="modal-actions">
-          <button className="confirm-btn" onClick={onClose}>Done</button>
+        {app.type === 'Native' && (
+          <div style={{ marginTop: '1.5rem', borderTop: '1px solid rgba(255,255,255,0.1)', paddingTop: '1rem' }}>
+            <h4 style={{ margin: '0 0 1rem 0', color: 'var(--text-secondary)', fontSize: '0.9rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>App Actions</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+              {handleRemove && (
+                <button
+                  onClick={() => { onClose(); handleRemove(app.id); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', width: '100%', padding: '0.75rem', background: 'rgba(239,68,68,0.1)', border: 'none', borderRadius: '6px', color: '#ef4444', cursor: 'pointer', fontSize: '0.95rem' }}
+                >
+                  <Trash size={18} /> Remove Application
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        <div className="modal-actions" style={{ marginTop: '1.5rem' }}>
+          <button className="confirm-btn" onClick={onClose} style={{ width: '100%', padding: '0.75rem', fontSize: '1rem' }}>Done</button>
         </div>
       </div>
     </div>,

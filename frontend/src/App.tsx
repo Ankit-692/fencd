@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import { Shield, Plus } from 'lucide-react';
 import { GetApps, TogglePermission, AddNativeApp, LaunchApp, SelectExecutable, RemoveNativeApp } from '../wailsjs/go/core/App';
-import { core } from '../wailsjs/go/models';import { Sidebar } from './components/Sidebar';
+import { core } from '../wailsjs/go/models'; import { Sidebar } from './components/Sidebar';
 import { AppCard } from './components/AppCard';
 import { AddAppModal } from './components/AddAppModal';
 import { SystemAppsModal } from './components/SystemAppsModal';
@@ -22,8 +22,8 @@ function App() {
   const [newAppIcon, setNewAppIcon] = useState('');
   const [launchingAppId, setLaunchingAppId] = useState<string | null>(null);
 
-  const [confirmDialog, setConfirmDialog] = useState<{message: string, onConfirm: () => void} | null>(null);
-  const [alertDialog, setAlertDialog] = useState<{message: string} | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{ message: string, onConfirm: () => void } | null>(null);
+  const [alertDialog, setAlertDialog] = useState<{ message: string } | null>(null);
 
   const showAlert = (message: string) => setAlertDialog({ message });
   const showConfirm = (message: string, onConfirm: () => void) => setConfirmDialog({ message, onConfirm });
@@ -58,7 +58,7 @@ function App() {
           if (perm === 'audioOutput') updatedPerms.microphone = !currentVal;
           if (perm === 'microphone') updatedPerms.audioOutput = !currentVal;
         }
-        
+
         return {
           ...app,
           permissions: updatedPerms
@@ -161,17 +161,17 @@ function App() {
                 <Plus size={18} /> Installed Apps
               </button>
               <button className="add-app-btn" onClick={handleAddNativeApp} style={{ background: 'var(--bg-card)' }}>
-                <Plus size={18} /> Add Custom
+                <Plus size={18} /> Add Custom / AppImages
               </button>
             </div>
           )}
         </div>
 
         <div className="info-banner" style={{
-          background: 'rgba(255,255,255,0.03)', 
-          border: '1px solid rgba(255,255,255,0.08)', 
-          padding: '1rem 1.25rem', 
-          borderRadius: '8px', 
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          padding: '1rem 1.25rem',
+          borderRadius: '8px',
           color: 'var(--text-secondary)',
           fontSize: '0.9rem',
           display: 'flex',
@@ -180,7 +180,7 @@ function App() {
           lineHeight: '1.4',
           marginBottom: '2rem'
         }}>
-          <Shield size={24} style={{color: 'var(--accent-color)', flexShrink: 0}} />
+          <Shield size={24} style={{ color: 'var(--accent-color)', flexShrink: 0 }} />
           <div>
             {activeTab === 'All' && "Manage all your applications from one dashboard. Permissions behave slightly differently based on the packaging format."}
             {(activeTab === 'Flatpak' || activeTab === 'Snap') && "These permissions apply system-wide. If the app is currently running, please restart it for the new permissions to take effect."}
@@ -224,9 +224,9 @@ function App() {
       )}
 
       {showSystemAppsModal && (
-        <SystemAppsModal 
-          setShowModal={setShowSystemAppsModal} 
-          onAppAdded={fetchApps} 
+        <SystemAppsModal
+          setShowModal={setShowSystemAppsModal}
+          onAppAdded={fetchApps}
           showAlert={showAlert}
         />
       )}

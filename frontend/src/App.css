@@ -151,6 +151,28 @@
   display: flex;
   align-items: center;
   gap: 1rem;
+  min-width: 0;
+}
+
+.icon-action-btn {
+  background: rgba(255,255,255,0.05);
+  border: none;
+  color: var(--text-primary);
+  border-radius: 6px;
+  padding: 0.3rem 0.4rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+.icon-action-btn:hover {
+  background: var(--accent-color);
+  color: white;
+}
+.icon-action-btn.danger:hover {
+  background: var(--danger);
+  color: white;
 }
 
 .mini-launch-btn {
@@ -184,6 +206,13 @@
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
+}
+
+.app-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
 }
 
 .app-info h3 {
