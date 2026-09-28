@@ -3,6 +3,7 @@ package core
 import (
 	"encoding/base64"
 	"fmt"
+	"html"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -28,7 +29,12 @@ func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
 	}
 
 	if icon == "" {
-		icon = "🚀" // Default icon
+		if strings.HasSuffix(strings.ToLower(execPath), ".appimage") {
+			icon = a.extractAppImageIcon(name, execPath)
+		}
+		if icon == "" {
+			icon = "🚀" // Default icon
+		}
 	}
 
 	newApp := AppModel{
@@ -62,6 +68,19 @@ func (a *App) RemoveNativeApp(appID string) bool {
 	for _, app := range apps {
 		if app.ID != appID {
 			newApps = append(newApps, app)
+		} else {
+			if strings.HasSuffix(strings.ToLower(app.ID), ".appimage") {
+				reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+				safeName := reg.ReplaceAllString(app.Name, "")
+				if safeName == "" {
+					safeName = "app"
+				}
+				home, err := os.UserHomeDir()
+				if err == nil {
+					cacheDir := filepath.Join(home, ".cache", "fencd", "appimages", fmt.Sprintf("fencd-%s", safeName))
+					os.RemoveAll(cacheDir)
+				}
+			}
 		}
 	}
 	err := writeNativeConfig(newApps)
@@ -84,7 +103,19 @@ func (a *App) getBwrapArgs(targetApp *AppModel) []string {
 		args = append(args, "--tmpfs", "/run") // hide dbus sockets
 	}
 
-	if !targetApp.Permissions.Display {
+	if targetApp.Permissions.Display {
+		// Explicitly bind Wayland socket if it exists (in case /run is a tmpfs when DBus is false)
+		waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
+		if waylandDisplay == "" {
+			waylandDisplay = "wayland-0"
+		}
+		uid := os.Getuid()
+		waylandSocket := fmt.Sprintf("/run/user/%d/%s", uid, waylandDisplay)
+		if _, err := os.Stat(waylandSocket); err == nil {
+			args = append(args, "--dir", fmt.Sprintf("/run/user/%d", uid))
+			args = append(args, "--bind", waylandSocket, waylandSocket)
+		}
+	} else {
 		args = append(args, "--tmpfs", "/tmp/.X11-unix") // hide X11 sockets
 	}
 
@@ -107,17 +138,15 @@ func (a *App) getBwrapArgs(targetApp *AppModel) []string {
 
 	// Filesystem
 	home, _ := os.UserHomeDir()
-	
-	// Create a tmpfs on home by default to block access
-	args = append(args, "--tmpfs", home)
 
 	if targetApp.Permissions.FSHost {
-		// Just an example, normally host is ro-bound at /
-		// If they want host write access, we could bind / (dangerous)
-		// For now we just bind the home dir fully if they have host access, or we could add --bind / /
+		// If they want host write access, we bind / read-write
 		args = append(args, "--bind", "/", "/")
 	} else if targetApp.Permissions.FSHome {
 		args = append(args, "--bind", home, home)
+	} else {
+		// Create a tmpfs on home by default to block access
+		args = append(args, "--tmpfs", home)
 	}
 
 	if targetApp.Permissions.AudioOutput {
@@ -200,7 +229,7 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 	if customName != "" {
 		nameToUse = customName
 	}
-	
+
 	iconToUse := targetApp.Icon
 	if customIcon != "" {
 		iconToUse = customIcon
@@ -235,7 +264,7 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 
 	desktopContent := fmt.Sprintf(`[Desktop Entry]
 Name=%s (Fencd Sandbox)
-Exec=%s
+Exec=%s %%U
 Type=Application
 Terminal=false
 Categories=Utility;
@@ -257,6 +286,14 @@ Categories=Utility;
 				os.WriteFile(iconPath, decoded, 0644)
 			}
 		}
+	} else if iconToUse != "" {
+		iconsDir := filepath.Join(home, ".local", "share", "icons")
+		os.MkdirAll(iconsDir, 0755)
+		iconPath = filepath.Join(iconsDir, fmt.Sprintf("fencd-%s.svg", safeName))
+		svgContent := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text x="50" y="50" font-size="80" text-anchor="middle" dy="28">%s</text>
+</svg>`, html.EscapeString(iconToUse))
+		os.WriteFile(iconPath, []byte(svgContent), 0644)
 	}
 
 	if iconPath != "" {
@@ -352,8 +389,49 @@ if [ -f "$CACHE_DIR/squashfs-root/chrome-sandbox" ]; then
     BWRAP_ARGS+=("--no-sandbox" "--disable-gpu-sandbox")
 fi
 
-exec bwrap "${BWRAP_ARGS[@]}"
+exec bwrap "${BWRAP_ARGS[@]}" "$@"
 `
 	err = os.WriteFile(wrapperPath, []byte(script), 0755)
 	return wrapperPath, err
+}
+
+func (a *App) extractAppImageIcon(name string, execPath string) string {
+	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+	safeName := reg.ReplaceAllString(name, "")
+	if safeName == "" {
+		safeName = "app"
+	}
+	home, _ := os.UserHomeDir()
+	cacheDir := filepath.Join(home, ".cache", "fencd", "appimages", fmt.Sprintf("fencd-%s", safeName))
+
+	os.MkdirAll(cacheDir, 0755)
+
+	statCmd := exec.Command("stat", "-c", "%Y-%s", execPath)
+	out, err := statCmd.Output()
+	currentStat := "unknown"
+	if err == nil {
+		currentStat = strings.TrimSpace(string(out))
+	}
+
+	extractedStatFile := filepath.Join(cacheDir, ".extracted")
+	extractedStat, err := os.ReadFile(extractedStatFile)
+	if err != nil || strings.TrimSpace(string(extractedStat)) != currentStat {
+		os.RemoveAll(cacheDir)
+		os.MkdirAll(cacheDir, 0755)
+		extractCmd := exec.Command(execPath, "--appimage-extract")
+		extractCmd.Dir = cacheDir
+		err = extractCmd.Run()
+		if err == nil {
+			os.WriteFile(extractedStatFile, []byte(currentStat), 0644)
+		} else {
+			return ""
+		}
+	}
+
+	dirIconPath := filepath.Join(cacheDir, "squashfs-root", ".DirIcon")
+	if _, err := os.Stat(dirIconPath); err == nil {
+		return fileToBase64(dirIconPath)
+	}
+
+	return ""
 }

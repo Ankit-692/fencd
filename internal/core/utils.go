@@ -2,7 +2,6 @@ package core
 
 import (
 	"encoding/base64"
-	"io"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -28,43 +27,6 @@ func (a *App) SelectExecutable() (string, error) {
 	})
 }
 
-// SelectIcon opens a native file dialog to select an image, returns base64
-func (a *App) SelectIcon() (string, error) {
-	filePath, err := runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Select Custom Icon",
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "Images (*.png, *.jpg, *.jpeg, *.svg)",
-				Pattern:     "*.png;*.jpg;*.jpeg;*.svg",
-			},
-		},
-	})
-	if err != nil || filePath == "" {
-		return "", err
-	}
-
-	file, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer file.Close()
-
-	// Read file
-	bytes, err := io.ReadAll(file)
-	if err != nil {
-		return "", err
-	}
-
-	// Detect content type
-	mimeType := http.DetectContentType(bytes)
-	if strings.HasSuffix(strings.ToLower(filePath), ".svg") {
-		mimeType = "image/svg+xml"
-	}
-
-	// Convert to Base64 URI
-	base64Str := base64.StdEncoding.EncodeToString(bytes)
-	return "data:" + mimeType + ";base64," + base64Str, nil
-}
 
 // getSystemIconBase64 attempts to find an icon on the system and returns its base64 URI.
 func getSystemIconBase64(iconName string) string {

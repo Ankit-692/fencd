@@ -18,6 +18,4 @@ export function RemoveNativeApp(arg1:string):Promise<boolean>;
 
 export function SelectExecutable():Promise<string>;
 
-export function SelectIcon():Promise<string>;
-
 export function TogglePermission(arg1:string,arg2:string,arg3:string,arg4:boolean):Promise<boolean>;

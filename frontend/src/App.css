@@ -101,6 +101,24 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+.secondary-btn {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-primary);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  font-weight: 600;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.secondary-btn:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
 .remove-btn {
   background: rgba(255, 50, 50, 0.1);
   color: #ff6b6b;
