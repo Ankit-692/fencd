@@ -1,9 +1,9 @@
 import { useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { core } from '../../wailsjs/go/models';
+import { models } from '../../wailsjs/go/models';
 
 interface Props {
-  app: core.AppModel;
+  app: models.AppModel;
   onClose: () => void;
   onConfirm: (name: string, icon: string) => void;
 }

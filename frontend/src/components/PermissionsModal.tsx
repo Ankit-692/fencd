@@ -1,11 +1,11 @@
 import { Globe, HardDrive, Camera, Mic, Monitor, Cpu, Activity, Home, Volume2, Server, X, Trash } from 'lucide-react';
 import { createPortal } from 'react-dom';
-import { core } from '../../wailsjs/go/models';
+import { models } from '../../wailsjs/go/models';
 
 interface PermissionsModalProps {
-  app: core.AppModel;
+  app: models.AppModel;
   onClose: () => void;
-  handleTogglePermission: (id: string, type: string, perm: keyof core.Permissions, currentVal: boolean) => void;
+  handleTogglePermission: (id: string, type: string, perm: keyof models.Permissions, currentVal: boolean) => void;
   onOpenShortcut?: () => void;
   handleRemove?: (id: string) => void;
 }

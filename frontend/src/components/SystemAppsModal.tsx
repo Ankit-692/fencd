@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { GetSystemApps, AddNativeApp } from '../../wailsjs/go/core/App';
-import { core } from '../../wailsjs/go/models';
+import { models } from '../../wailsjs/go/models';
 
 interface Props {
   setShowModal: (show: boolean) => void;
@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function SystemAppsModal({ setShowModal, onAppAdded, showAlert }: Props) {
-  const [apps, setApps] = useState<core.SystemApp[]>([]);
+  const [apps, setApps] = useState<models.SystemApp[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [addingApp, setAddingApp] = useState<string | null>(null);
@@ -28,7 +28,7 @@ export function SystemAppsModal({ setShowModal, onAppAdded, showAlert }: Props) 
     fetchApps();
   }, []);
 
-  const handleAdd = async (app: core.SystemApp) => {
+  const handleAdd = async (app: models.SystemApp) => {
     setAddingApp(app.execPath);
     try {
       const success = await AddNativeApp(app.name, app.execPath, app.icon);

@@ -1,24 +1,28 @@
-package core
+package native
 
 import (
 	"encoding/base64"
 	"fmt"
 	"html"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
+
+	"fencd/internal/models"
 )
 
-// getNativeApps returns all natively tracked apps
-func (a *App) getNativeApps() []AppModel {
+// GetApps returns all natively tracked apps
+func GetApps() []models.AppModel {
 	return readNativeConfig()
 }
 
 // AddNativeApp adds a new native app to the configuration
-func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
+func AddNativeApp(name string, execPath string, icon string) bool {
 	apps := readNativeConfig()
 
 	// Check if already exists
@@ -30,19 +34,19 @@ func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
 
 	if icon == "" {
 		if strings.HasSuffix(strings.ToLower(execPath), ".appimage") {
-			icon = a.extractAppImageIcon(name, execPath)
+			icon = extractAppImageIcon(name, execPath)
 		}
 		if icon == "" {
 			icon = "🚀" // Default icon
 		}
 	}
 
-	newApp := AppModel{
+	newApp := models.AppModel{
 		ID:   execPath,
 		Name: name,
 		Type: "Native",
 		Icon: icon,
-		Permissions: Permissions{
+		Permissions: models.Permissions{
 			Network:        true,
 			Camera:         true,
 			Microphone:     true,
@@ -62,9 +66,9 @@ func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
 }
 
 // RemoveNativeApp removes a native app from tracking
-func (a *App) RemoveNativeApp(appID string) bool {
+func RemoveNativeApp(appID string) bool {
 	apps := readNativeConfig()
-	var newApps []AppModel
+	var newApps []models.AppModel
 	for _, app := range apps {
 		if app.ID != appID {
 			newApps = append(newApps, app)
@@ -79,7 +83,28 @@ func (a *App) RemoveNativeApp(appID string) bool {
 				if err == nil {
 					cacheDir := filepath.Join(home, ".cache", "fencd", "appimages", fmt.Sprintf("fencd-%s", safeName))
 					os.RemoveAll(cacheDir)
+					
+					wrapperPath := filepath.Join(home, ".local", "share", "fencd", "wrappers", fmt.Sprintf("fencd-%s.sh", safeName))
+					os.Remove(wrapperPath)
 				}
+			}
+
+			// Clean up desktop shortcut and icons
+			reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+			safeName := reg.ReplaceAllString(app.Name, "")
+			if safeName == "" {
+				safeName = "app"
+			}
+			home, err := os.UserHomeDir()
+			if err == nil {
+				desktopFile := filepath.Join(home, ".local", "share", "applications", fmt.Sprintf("fencd-%s.desktop", safeName))
+				os.Remove(desktopFile)
+				
+				iconPng := filepath.Join(home, ".local", "share", "icons", fmt.Sprintf("fencd-%s.png", safeName))
+				os.Remove(iconPng)
+				
+				iconSvg := filepath.Join(home, ".local", "share", "icons", fmt.Sprintf("fencd-%s.svg", safeName))
+				os.Remove(iconSvg)
 			}
 		}
 	}
@@ -88,7 +113,7 @@ func (a *App) RemoveNativeApp(appID string) bool {
 }
 
 // getBwrapArgs generates the bubblewrap arguments for a given app
-func (a *App) getBwrapArgs(targetApp *AppModel) []string {
+func getBwrapArgs(targetApp *models.AppModel) []string {
 	args := []string{
 		"--ro-bind", "/", "/", // Base filesystem is read-only
 		"--dev", "/dev",
@@ -162,10 +187,10 @@ func (a *App) getBwrapArgs(targetApp *AppModel) []string {
 	return args
 }
 
-// LaunchNativeApp launches a native app inside a Bubblewrap sandbox
-func (a *App) LaunchNativeApp(appID string) bool {
+// LaunchApp launches a native app inside a Bubblewrap sandbox
+func LaunchApp(appID string) bool {
 	apps := readNativeConfig()
-	var targetApp *AppModel
+	var targetApp *models.AppModel
 	for _, app := range apps {
 		if app.ID == appID {
 			targetApp = &app
@@ -177,7 +202,7 @@ func (a *App) LaunchNativeApp(appID string) bool {
 		return false
 	}
 
-	args := a.getBwrapArgs(targetApp)
+	args := getBwrapArgs(targetApp)
 
 	var cmd *exec.Cmd
 	if strings.HasSuffix(strings.ToLower(targetApp.ID), ".appimage") {
@@ -186,7 +211,7 @@ func (a *App) LaunchNativeApp(appID string) bool {
 		if safeName == "" {
 			safeName = "app"
 		}
-		wrapperPath, err := a.generateAppImageWrapper(targetApp, safeName, args)
+		wrapperPath, err := generateAppImageWrapper(targetApp, safeName, args)
 		if err == nil {
 			cmd = exec.Command(wrapperPath)
 		} else {
@@ -210,9 +235,9 @@ func (a *App) LaunchNativeApp(appID string) bool {
 }
 
 // CreateDesktopShortcut generates a .desktop file to launch the sandboxed app
-func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon string) bool {
+func CreateDesktopShortcut(appID string, customName string, customIcon string) bool {
 	apps := readNativeConfig()
-	var targetApp *AppModel
+	var targetApp *models.AppModel
 	for _, app := range apps {
 		if app.ID == appID {
 			targetApp = &app
@@ -223,12 +248,14 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 		return false
 	}
 
-	args := a.getBwrapArgs(targetApp)
+	args := getBwrapArgs(targetApp)
 
 	nameToUse := targetApp.Name
 	if customName != "" {
 		nameToUse = customName
 	}
+	nameToUse = strings.ReplaceAll(nameToUse, "\n", " ")
+	nameToUse = strings.ReplaceAll(nameToUse, "\r", "")
 
 	iconToUse := targetApp.Icon
 	if customIcon != "" {
@@ -243,7 +270,7 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 
 	var execCmd string
 	if strings.HasSuffix(strings.ToLower(targetApp.ID), ".appimage") {
-		wrapperPath, err := a.generateAppImageWrapper(targetApp, safeName, args)
+		wrapperPath, err := generateAppImageWrapper(targetApp, safeName, args)
 		if err == nil {
 			execCmd = fmt.Sprintf("\"%s\"", wrapperPath)
 		}
@@ -253,11 +280,7 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 		var execStrBuilder strings.Builder
 		execStrBuilder.WriteString("bwrap")
 		for _, arg := range args {
-			if strings.Contains(arg, " ") {
-				execStrBuilder.WriteString(fmt.Sprintf(" \"%s\"", arg))
-			} else {
-				execStrBuilder.WriteString(" " + arg)
-			}
+			execStrBuilder.WriteString(fmt.Sprintf(" %q", arg))
 		}
 		execCmd = execStrBuilder.String()
 	}
@@ -309,7 +332,7 @@ Categories=Utility;
 	return err == nil
 }
 
-func (a *App) toggleNativePermission(appID string, permission string, enable bool) bool {
+func TogglePermission(appID string, permission string, enable bool) bool {
 	apps := readNativeConfig()
 	found := false
 	for i, app := range apps {
@@ -349,7 +372,7 @@ func (a *App) toggleNativePermission(appID string, permission string, enable boo
 	return err == nil
 }
 
-func (a *App) generateAppImageWrapper(targetApp *AppModel, safeName string, args []string) (string, error) {
+func generateAppImageWrapper(targetApp *models.AppModel, safeName string, args []string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -370,7 +393,7 @@ if [ ! -f "$CACHE_DIR/.extracted" ] || [ "$(cat "$CACHE_DIR/.extracted" 2>/dev/n
     rm -rf "$CACHE_DIR"
     mkdir -p "$CACHE_DIR"
     cd "$CACHE_DIR"
-    "$APPIMAGE" --appimage-extract > /dev/null
+    bwrap --ro-bind / / --dev /dev --proc /proc --bind "$CACHE_DIR" "$CACHE_DIR" --unshare-all --chdir "$CACHE_DIR" "$APPIMAGE" --appimage-extract > /dev/null
     echo "$CURRENT_STAT" > "$CACHE_DIR/.extracted"
 fi
 
@@ -395,7 +418,7 @@ exec bwrap "${BWRAP_ARGS[@]}" "$@"
 	return wrapperPath, err
 }
 
-func (a *App) extractAppImageIcon(name string, execPath string) string {
+func extractAppImageIcon(name string, execPath string) string {
 	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
 	safeName := reg.ReplaceAllString(name, "")
 	if safeName == "" {
@@ -418,7 +441,16 @@ func (a *App) extractAppImageIcon(name string, execPath string) string {
 	if err != nil || strings.TrimSpace(string(extractedStat)) != currentStat {
 		os.RemoveAll(cacheDir)
 		os.MkdirAll(cacheDir, 0755)
-		extractCmd := exec.Command(execPath, "--appimage-extract")
+		bwrapArgs := []string{
+			"--ro-bind", "/", "/",
+			"--dev", "/dev",
+			"--proc", "/proc",
+			"--bind", cacheDir, cacheDir,
+			"--unshare-all",
+			"--chdir", cacheDir,
+			execPath, "--appimage-extract",
+		}
+		extractCmd := exec.Command("bwrap", bwrapArgs...)
 		extractCmd.Dir = cacheDir
 		err = extractCmd.Run()
 		if err == nil {
@@ -434,4 +466,25 @@ func (a *App) extractAppImageIcon(name string, execPath string) string {
 	}
 
 	return ""
+}
+
+func fileToBase64(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return "🚀"
+	}
+	defer file.Close()
+
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return "🚀"
+	}
+
+	mimeType := http.DetectContentType(bytes)
+	if strings.HasSuffix(strings.ToLower(path), ".svg") {
+		mimeType = "image/svg+xml"
+	}
+
+	base64Str := base64.StdEncoding.EncodeToString(bytes)
+	return "data:" + mimeType + ";base64," + base64Str
 }

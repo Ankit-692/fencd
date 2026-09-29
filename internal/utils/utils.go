@@ -1,4 +1,4 @@
-package core
+package utils
 
 import (
 	"encoding/base64"
@@ -6,30 +6,10 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"github.com/wailsapp/wails/v2/pkg/runtime"
 )
 
-// SelectExecutable opens a native file dialog to select an executable or AppImage
-func (a *App) SelectExecutable() (string, error) {
-	return runtime.OpenFileDialog(a.ctx, runtime.OpenDialogOptions{
-		Title: "Select Executable or AppImage",
-		Filters: []runtime.FileFilter{
-			{
-				DisplayName: "Executables (*.AppImage, *.sh, *.bin)",
-				Pattern:     "*.AppImage;*.sh;*.bin",
-			},
-			{
-				DisplayName: "All Files",
-				Pattern:     "*",
-			},
-		},
-	})
-}
-
-
-// getSystemIconBase64 attempts to find an icon on the system and returns its base64 URI.
-func getSystemIconBase64(iconName string) string {
+// GetSystemIconBase64 attempts to find an icon on the system and returns its base64 URI.
+func GetSystemIconBase64(iconName string) string {
 	home, _ := os.UserHomeDir()
 
 	patterns := []string{

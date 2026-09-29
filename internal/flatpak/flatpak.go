@@ -1,14 +1,17 @@
-package core
+package flatpak
 
 import (
 	"bytes"
 	"os/exec"
 	"strings"
+
+	"fencd/internal/models"
+	"fencd/internal/utils"
 )
 
-// getFlatpaks discovers all flatpaks and their current permissions
-func (a *App) getFlatpaks() []AppModel {
-	var apps []AppModel
+// GetApps discovers all flatpaks and their current permissions
+func GetApps() []models.AppModel {
+	var apps []models.AppModel
 
 	cmd := exec.Command("flatpak", "list", "--app", "--columns=application,name")
 	var out bytes.Buffer
@@ -32,14 +35,14 @@ func (a *App) getFlatpaks() []AppModel {
 				continue
 			}
 
-			permissions := a.getFlatpakPermissions(appID)
+			permissions := getFlatpakPermissions(appID)
 
-			icon := getSystemIconBase64(appID)
+			icon := utils.GetSystemIconBase64(appID)
 			if icon == "" {
 				icon = "📦" // Use a generic box icon for flatpaks fallback
 			}
 
-			apps = append(apps, AppModel{
+			apps = append(apps, models.AppModel{
 				ID:          appID,
 				Name:        appName,
 				Type:        "Flatpak",
@@ -51,14 +54,14 @@ func (a *App) getFlatpaks() []AppModel {
 	return apps
 }
 
-func (a *App) getFlatpakPermissions(appID string) Permissions {
+func getFlatpakPermissions(appID string) models.Permissions {
 	cmd := exec.Command("flatpak", "info", "--show-permissions", appID)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Run()
 
 	output := out.String()
-	perms := Permissions{
+	perms := models.Permissions{
 		Network:        false,
 		Camera:         false,
 		Microphone:     false,
@@ -112,7 +115,7 @@ func (a *App) getFlatpakPermissions(appID string) Permissions {
 	return perms
 }
 
-func (a *App) toggleFlatpakPermission(appID string, permission string, enable bool) bool {
+func TogglePermission(appID string, permission string, enable bool) bool {
 	var flags []string
 
 	switch permission {

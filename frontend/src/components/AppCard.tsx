@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Play, ExternalLink, Globe, HardDrive, Camera, Mic, Trash, Monitor, Cpu, Activity, Home, Volume2, Server, Settings } from 'lucide-react';
-import { core } from '../../wailsjs/go/models';
+import { models } from '../../wailsjs/go/models';
 import { CreateDesktopShortcut } from '../../wailsjs/go/core/App';
 import { ShortcutModal } from './ShortcutModal';
 import { PermissionsModal } from './PermissionsModal';
 
 interface AppCardProps {
-  app: core.AppModel;
+  app: models.AppModel;
   launchingAppId: string | null;
   handleLaunch: (id: string, type: string) => void;
-  handleTogglePermission: (id: string, type: string, perm: keyof core.Permissions, currentVal: boolean) => void;
+  handleTogglePermission: (id: string, type: string, perm: keyof models.Permissions, currentVal: boolean) => void;
   handleRemove: (id: string) => void;
   showAlert: (msg: string) => void;
 }
