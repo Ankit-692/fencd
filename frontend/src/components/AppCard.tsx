@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { Play, ExternalLink, Globe, HardDrive, Camera, Mic, Trash, Monitor, Cpu, Activity, Home, Volume2, Server, Settings } from 'lucide-react';
-import { core } from '../../wailsjs/go/models';
+import { models } from '../../wailsjs/go/models';
 import { CreateDesktopShortcut } from '../../wailsjs/go/core/App';
 import { ShortcutModal } from './ShortcutModal';
 import { PermissionsModal } from './PermissionsModal';
 
 interface AppCardProps {
-  app: core.AppModel;
+  app: models.AppModel;
   launchingAppId: string | null;
   handleLaunch: (id: string, type: string) => void;
-  handleTogglePermission: (id: string, type: string, perm: keyof core.Permissions, currentVal: boolean) => void;
+  handleTogglePermission: (id: string, type: string, perm: keyof models.Permissions, currentVal: boolean) => void;
   handleRemove: (id: string) => void;
   showAlert: (msg: string) => void;
 }
@@ -86,12 +86,12 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
         )}
       </div>
 
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginTop: 'auto', paddingTop: '0.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '0.75rem', marginTop: 'auto', paddingTop: '0.5rem' }}>
         <button 
           onClick={() => setShowPermissionsModal(true)}
           title="Manage App"
           style={{ 
-            flex: app.type === 'Native' ? '1 1 100%' : '1',
+            gridColumn: app.type === 'Native' ? 'span 2' : 'span 1',
             background: 'var(--accent-color)', 
             border: 'none', 
             color: 'white', 
@@ -118,7 +118,7 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
             onClick={() => setShowShortcutModal(true)}
             title="Create Sandbox Shortcut"
             style={{ 
-              flex: 1,
+              gridColumn: 'span 1',
               background: 'rgba(255,255,255,0.08)', 
               border: 'none', 
               color: 'var(--text-primary)', 
@@ -146,8 +146,7 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
           disabled={launchingAppId === app.id}
           title="Launch App directly"
           style={{ 
-            flex: app.type === 'Native' ? 1 : '0 1 auto',
-            minWidth: app.type === 'Native' ? 'auto' : '100px',
+            gridColumn: 'span 1',
             background: 'rgba(255,255,255,0.08)', 
             border: 'none', 
             color: 'var(--text-primary)', 
@@ -167,7 +166,7 @@ export function AppCard({ app, launchingAppId, handleLaunch, handleTogglePermiss
           onMouseEnter={(e) => { if (launchingAppId !== app.id) e.currentTarget.style.background = 'rgba(255,255,255,0.15)'; }}
           onMouseLeave={(e) => { if (launchingAppId !== app.id) e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
         >
-          <Play size={18} /> {app.type === 'Native' ? "Launch" : (launchingAppId === app.id ? "Launching..." : "Launch")}
+          <Play size={18} /> {launchingAppId === app.id ? "Launching..." : "Launch"}
         </button>
       </div>
 

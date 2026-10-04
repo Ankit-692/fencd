@@ -1,15 +1,18 @@
-package core
+package snap
 
 import (
 	"bytes"
 	"fmt"
 	"os/exec"
 	"strings"
+
+	"fencd/internal/models"
+	"fencd/internal/utils"
 )
 
-// getSnaps discovers all snap packages and their current permissions
-func (a *App) getSnaps() []AppModel {
-	var apps []AppModel
+// GetApps discovers all snap packages and their current permissions
+func GetApps() []models.AppModel {
+	var apps []models.AppModel
 
 	cmd := exec.Command("snap", "list")
 	var out bytes.Buffer
@@ -35,14 +38,14 @@ func (a *App) getSnaps() []AppModel {
 				continue
 			}
 
-			permissions := a.getSnapPermissions(appName)
+			permissions := getSnapPermissions(appName)
 
-			icon := getSystemIconBase64(appName)
+			icon := utils.GetSystemIconBase64(appName)
 			if icon == "" {
 				icon = "🦊" // Snap icon fallback
 			}
 
-			apps = append(apps, AppModel{
+			apps = append(apps, models.AppModel{
 				ID:          appName,
 				Name:        appName, // Snaps usually don't provide a human-readable title in `snap list`
 				Type:        "Snap",
@@ -54,13 +57,13 @@ func (a *App) getSnaps() []AppModel {
 	return apps
 }
 
-func (a *App) getSnapPermissions(appName string) Permissions {
+func getSnapPermissions(appName string) models.Permissions {
 	cmd := exec.Command("snap", "connections", appName)
 	var out bytes.Buffer
 	cmd.Stdout = &out
 	cmd.Run()
 
-	perms := Permissions{
+	perms := models.Permissions{
 		Network:        false,
 		Camera:         false,
 		Microphone:     false,
@@ -134,7 +137,7 @@ func (a *App) getSnapPermissions(appName string) Permissions {
 	return perms
 }
 
-func (a *App) toggleSnapPermission(appID string, permission string, enable bool) bool {
+func TogglePermission(appID string, permission string, enable bool) bool {
 	var interfaces []string
 
 	switch permission {
@@ -190,12 +193,20 @@ func (a *App) toggleSnapPermission(appID string, permission string, enable bool)
 	}
 
 	if needsPkexec {
+		var args []string
+		args = append(args, "sh", "-c")
+
 		var scriptBuilder strings.Builder
-		for _, iface := range interfaces {
-			scriptBuilder.WriteString(fmt.Sprintf("snap %s %s:%s; ", action, appID, iface))
+		for i := range interfaces {
+			// Using positional arguments to avoid injection
+			// $1 is action, $2 is appID, ${3}, ${4} etc are interfaces
+			scriptBuilder.WriteString(fmt.Sprintf("snap \"$1\" \"$2\":\"${%d}\"; ", i+3))
 		}
 		
-		cmdPk := exec.Command("pkexec", "sh", "-c", scriptBuilder.String())
+		args = append(args, scriptBuilder.String(), "_", action, appID)
+		args = append(args, interfaces...)
+
+		cmdPk := exec.Command("pkexec", args...)
 		var stderrPk bytes.Buffer
 		cmdPk.Stderr = &stderrPk
 		errPk := cmdPk.Run()

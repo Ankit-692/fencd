@@ -1,23 +1,28 @@
-package core
+package native
 
 import (
 	"encoding/base64"
 	"fmt"
+	"html"
+	"io"
+	"net/http"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
 	"strings"
 	"syscall"
+
+	"fencd/internal/models"
 )
 
-// getNativeApps returns all natively tracked apps
-func (a *App) getNativeApps() []AppModel {
+// GetApps returns all natively tracked apps
+func GetApps() []models.AppModel {
 	return readNativeConfig()
 }
 
 // AddNativeApp adds a new native app to the configuration
-func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
+func AddNativeApp(name string, execPath string, icon string) bool {
 	apps := readNativeConfig()
 
 	// Check if already exists
@@ -28,15 +33,20 @@ func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
 	}
 
 	if icon == "" {
-		icon = "🚀" // Default icon
+		if strings.HasSuffix(strings.ToLower(execPath), ".appimage") {
+			icon = extractAppImageIcon(name, execPath)
+		}
+		if icon == "" {
+			icon = "🚀" // Default icon
+		}
 	}
 
-	newApp := AppModel{
+	newApp := models.AppModel{
 		ID:   execPath,
 		Name: name,
 		Type: "Native",
 		Icon: icon,
-		Permissions: Permissions{
+		Permissions: models.Permissions{
 			Network:        true,
 			Camera:         true,
 			Microphone:     true,
@@ -56,12 +66,46 @@ func (a *App) AddNativeApp(name string, execPath string, icon string) bool {
 }
 
 // RemoveNativeApp removes a native app from tracking
-func (a *App) RemoveNativeApp(appID string) bool {
+func RemoveNativeApp(appID string) bool {
 	apps := readNativeConfig()
-	var newApps []AppModel
+	var newApps []models.AppModel
 	for _, app := range apps {
 		if app.ID != appID {
 			newApps = append(newApps, app)
+		} else {
+			if strings.HasSuffix(strings.ToLower(app.ID), ".appimage") {
+				reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+				safeName := reg.ReplaceAllString(app.Name, "")
+				if safeName == "" {
+					safeName = "app"
+				}
+				home, err := os.UserHomeDir()
+				if err == nil {
+					cacheDir := filepath.Join(home, ".cache", "fencd", "appimages", fmt.Sprintf("fencd-%s", safeName))
+					os.RemoveAll(cacheDir)
+					
+					wrapperPath := filepath.Join(home, ".local", "share", "fencd", "wrappers", fmt.Sprintf("fencd-%s.sh", safeName))
+					os.Remove(wrapperPath)
+				}
+			}
+
+			// Clean up desktop shortcut and icons
+			reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+			safeName := reg.ReplaceAllString(app.Name, "")
+			if safeName == "" {
+				safeName = "app"
+			}
+			home, err := os.UserHomeDir()
+			if err == nil {
+				desktopFile := filepath.Join(home, ".local", "share", "applications", fmt.Sprintf("fencd-%s.desktop", safeName))
+				os.Remove(desktopFile)
+				
+				iconPng := filepath.Join(home, ".local", "share", "icons", fmt.Sprintf("fencd-%s.png", safeName))
+				os.Remove(iconPng)
+				
+				iconSvg := filepath.Join(home, ".local", "share", "icons", fmt.Sprintf("fencd-%s.svg", safeName))
+				os.Remove(iconSvg)
+			}
 		}
 	}
 	err := writeNativeConfig(newApps)
@@ -69,14 +113,21 @@ func (a *App) RemoveNativeApp(appID string) bool {
 }
 
 // getBwrapArgs generates the bubblewrap arguments for a given app
-func (a *App) getBwrapArgs(targetApp *AppModel) []string {
-	args := []string{
-		"--ro-bind", "/", "/", // Base filesystem is read-only
+func getBwrapArgs(targetApp *models.AppModel) []string {
+	args := []string{}
+
+	if targetApp.Permissions.FSHost {
+		args = append(args, "--bind", "/", "/")
+	} else {
+		args = append(args, "--ro-bind", "/", "/")
+	}
+
+	args = append(args,
 		"--dev", "/dev",
 		"--proc", "/proc",
 		"--bind", "/tmp", "/tmp", // tmp must be writable for apps to function
-		"--tmpfs", "/dev/shm", // Chromium IPC requires a writable /dev/shm
-	}
+		"--tmpfs", "/dev/shm",    // Chromium IPC requires a writable /dev/shm
+	)
 
 	if targetApp.Permissions.DBus {
 		args = append(args, "--bind", "/run", "/run") // run is often needed for sockets/DBus
@@ -84,7 +135,19 @@ func (a *App) getBwrapArgs(targetApp *AppModel) []string {
 		args = append(args, "--tmpfs", "/run") // hide dbus sockets
 	}
 
-	if !targetApp.Permissions.Display {
+	if targetApp.Permissions.Display {
+		// Explicitly bind Wayland socket if it exists (in case /run is a tmpfs when DBus is false)
+		waylandDisplay := os.Getenv("WAYLAND_DISPLAY")
+		if waylandDisplay == "" {
+			waylandDisplay = "wayland-0"
+		}
+		uid := os.Getuid()
+		waylandSocket := fmt.Sprintf("/run/user/%d/%s", uid, waylandDisplay)
+		if _, err := os.Stat(waylandSocket); err == nil {
+			args = append(args, "--dir", fmt.Sprintf("/run/user/%d", uid))
+			args = append(args, "--bind", waylandSocket, waylandSocket)
+		}
+	} else {
 		args = append(args, "--tmpfs", "/tmp/.X11-unix") // hide X11 sockets
 	}
 
@@ -107,17 +170,14 @@ func (a *App) getBwrapArgs(targetApp *AppModel) []string {
 
 	// Filesystem
 	home, _ := os.UserHomeDir()
-	
-	// Create a tmpfs on home by default to block access
-	args = append(args, "--tmpfs", home)
 
-	if targetApp.Permissions.FSHost {
-		// Just an example, normally host is ro-bound at /
-		// If they want host write access, we could bind / (dangerous)
-		// For now we just bind the home dir fully if they have host access, or we could add --bind / /
-		args = append(args, "--bind", "/", "/")
-	} else if targetApp.Permissions.FSHome {
-		args = append(args, "--bind", home, home)
+	if !targetApp.Permissions.FSHost {
+		if targetApp.Permissions.FSHome {
+			args = append(args, "--bind", home, home)
+		} else {
+			// Create a tmpfs on home by default to block access
+			args = append(args, "--tmpfs", home)
+		}
 	}
 
 	if targetApp.Permissions.AudioOutput {
@@ -133,10 +193,10 @@ func (a *App) getBwrapArgs(targetApp *AppModel) []string {
 	return args
 }
 
-// LaunchNativeApp launches a native app inside a Bubblewrap sandbox
-func (a *App) LaunchNativeApp(appID string) bool {
+// LaunchApp launches a native app inside a Bubblewrap sandbox
+func LaunchApp(appID string) bool {
 	apps := readNativeConfig()
-	var targetApp *AppModel
+	var targetApp *models.AppModel
 	for _, app := range apps {
 		if app.ID == appID {
 			targetApp = &app
@@ -148,7 +208,7 @@ func (a *App) LaunchNativeApp(appID string) bool {
 		return false
 	}
 
-	args := a.getBwrapArgs(targetApp)
+	args := getBwrapArgs(targetApp)
 
 	var cmd *exec.Cmd
 	if strings.HasSuffix(strings.ToLower(targetApp.ID), ".appimage") {
@@ -157,7 +217,7 @@ func (a *App) LaunchNativeApp(appID string) bool {
 		if safeName == "" {
 			safeName = "app"
 		}
-		wrapperPath, err := a.generateAppImageWrapper(targetApp, safeName, args)
+		wrapperPath, err := generateAppImageWrapper(targetApp, safeName, args)
 		if err == nil {
 			cmd = exec.Command(wrapperPath)
 		} else {
@@ -181,9 +241,9 @@ func (a *App) LaunchNativeApp(appID string) bool {
 }
 
 // CreateDesktopShortcut generates a .desktop file to launch the sandboxed app
-func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon string) bool {
+func CreateDesktopShortcut(appID string, customName string, customIcon string) bool {
 	apps := readNativeConfig()
-	var targetApp *AppModel
+	var targetApp *models.AppModel
 	for _, app := range apps {
 		if app.ID == appID {
 			targetApp = &app
@@ -194,13 +254,15 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 		return false
 	}
 
-	args := a.getBwrapArgs(targetApp)
+	args := getBwrapArgs(targetApp)
 
 	nameToUse := targetApp.Name
 	if customName != "" {
 		nameToUse = customName
 	}
-	
+	nameToUse = strings.ReplaceAll(nameToUse, "\n", " ")
+	nameToUse = strings.ReplaceAll(nameToUse, "\r", "")
+
 	iconToUse := targetApp.Icon
 	if customIcon != "" {
 		iconToUse = customIcon
@@ -214,7 +276,7 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 
 	var execCmd string
 	if strings.HasSuffix(strings.ToLower(targetApp.ID), ".appimage") {
-		wrapperPath, err := a.generateAppImageWrapper(targetApp, safeName, args)
+		wrapperPath, err := generateAppImageWrapper(targetApp, safeName, args)
 		if err == nil {
 			execCmd = fmt.Sprintf("\"%s\"", wrapperPath)
 		}
@@ -224,18 +286,14 @@ func (a *App) CreateDesktopShortcut(appID string, customName string, customIcon 
 		var execStrBuilder strings.Builder
 		execStrBuilder.WriteString("bwrap")
 		for _, arg := range args {
-			if strings.Contains(arg, " ") {
-				execStrBuilder.WriteString(fmt.Sprintf(" \"%s\"", arg))
-			} else {
-				execStrBuilder.WriteString(" " + arg)
-			}
+			execStrBuilder.WriteString(fmt.Sprintf(" %q", arg))
 		}
 		execCmd = execStrBuilder.String()
 	}
 
 	desktopContent := fmt.Sprintf(`[Desktop Entry]
 Name=%s (Fencd Sandbox)
-Exec=%s
+Exec=%s %%U
 Type=Application
 Terminal=false
 Categories=Utility;
@@ -257,6 +315,14 @@ Categories=Utility;
 				os.WriteFile(iconPath, decoded, 0644)
 			}
 		}
+	} else if iconToUse != "" {
+		iconsDir := filepath.Join(home, ".local", "share", "icons")
+		os.MkdirAll(iconsDir, 0755)
+		iconPath = filepath.Join(iconsDir, fmt.Sprintf("fencd-%s.svg", safeName))
+		svgContent := fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <text x="50" y="50" font-size="80" text-anchor="middle" dy="28">%s</text>
+</svg>`, html.EscapeString(iconToUse))
+		os.WriteFile(iconPath, []byte(svgContent), 0644)
 	}
 
 	if iconPath != "" {
@@ -272,7 +338,7 @@ Categories=Utility;
 	return err == nil
 }
 
-func (a *App) toggleNativePermission(appID string, permission string, enable bool) bool {
+func TogglePermission(appID string, permission string, enable bool) bool {
 	apps := readNativeConfig()
 	found := false
 	for i, app := range apps {
@@ -312,7 +378,7 @@ func (a *App) toggleNativePermission(appID string, permission string, enable boo
 	return err == nil
 }
 
-func (a *App) generateAppImageWrapper(targetApp *AppModel, safeName string, args []string) (string, error) {
+func generateAppImageWrapper(targetApp *models.AppModel, safeName string, args []string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return "", err
@@ -333,7 +399,7 @@ if [ ! -f "$CACHE_DIR/.extracted" ] || [ "$(cat "$CACHE_DIR/.extracted" 2>/dev/n
     rm -rf "$CACHE_DIR"
     mkdir -p "$CACHE_DIR"
     cd "$CACHE_DIR"
-    "$APPIMAGE" --appimage-extract > /dev/null
+    bwrap --ro-bind / / --dev /dev --proc /proc --bind "$CACHE_DIR" "$CACHE_DIR" --unshare-all --chdir "$CACHE_DIR" "$APPIMAGE" --appimage-extract > /dev/null
     echo "$CURRENT_STAT" > "$CACHE_DIR/.extracted"
 fi
 
@@ -352,8 +418,79 @@ if [ -f "$CACHE_DIR/squashfs-root/chrome-sandbox" ]; then
     BWRAP_ARGS+=("--no-sandbox" "--disable-gpu-sandbox")
 fi
 
-exec bwrap "${BWRAP_ARGS[@]}"
+exec bwrap "${BWRAP_ARGS[@]}" "$@"
 `
 	err = os.WriteFile(wrapperPath, []byte(script), 0755)
 	return wrapperPath, err
+}
+
+func extractAppImageIcon(name string, execPath string) string {
+	reg := regexp.MustCompile("[^a-zA-Z0-9]+")
+	safeName := reg.ReplaceAllString(name, "")
+	if safeName == "" {
+		safeName = "app"
+	}
+	home, _ := os.UserHomeDir()
+	cacheDir := filepath.Join(home, ".cache", "fencd", "appimages", fmt.Sprintf("fencd-%s", safeName))
+
+	os.MkdirAll(cacheDir, 0755)
+
+	statCmd := exec.Command("stat", "-c", "%Y-%s", execPath)
+	out, err := statCmd.Output()
+	currentStat := "unknown"
+	if err == nil {
+		currentStat = strings.TrimSpace(string(out))
+	}
+
+	extractedStatFile := filepath.Join(cacheDir, ".extracted")
+	extractedStat, err := os.ReadFile(extractedStatFile)
+	if err != nil || strings.TrimSpace(string(extractedStat)) != currentStat {
+		os.RemoveAll(cacheDir)
+		os.MkdirAll(cacheDir, 0755)
+		bwrapArgs := []string{
+			"--ro-bind", "/", "/",
+			"--dev", "/dev",
+			"--proc", "/proc",
+			"--bind", cacheDir, cacheDir,
+			"--unshare-all",
+			"--chdir", cacheDir,
+			execPath, "--appimage-extract",
+		}
+		extractCmd := exec.Command("bwrap", bwrapArgs...)
+		extractCmd.Dir = cacheDir
+		err = extractCmd.Run()
+		if err == nil {
+			os.WriteFile(extractedStatFile, []byte(currentStat), 0644)
+		} else {
+			return ""
+		}
+	}
+
+	dirIconPath := filepath.Join(cacheDir, "squashfs-root", ".DirIcon")
+	if _, err := os.Stat(dirIconPath); err == nil {
+		return fileToBase64(dirIconPath)
+	}
+
+	return ""
+}
+
+func fileToBase64(path string) string {
+	file, err := os.Open(path)
+	if err != nil {
+		return "🚀"
+	}
+	defer file.Close()
+
+	bytes, err := io.ReadAll(file)
+	if err != nil {
+		return "🚀"
+	}
+
+	mimeType := http.DetectContentType(bytes)
+	if strings.HasSuffix(strings.ToLower(path), ".svg") {
+		mimeType = "image/svg+xml"
+	}
+
+	base64Str := base64.StdEncoding.EncodeToString(bytes)
+	return "data:" + mimeType + ";base64," + base64Str
 }

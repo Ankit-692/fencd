@@ -1,0 +1,36 @@
+name: "fencd"
+arch: "amd64"
+platform: "linux"
+version: "0.1.0"
+section: "default"
+priority: "extra"
+maintainer: "Ankit Bharti <bhartiankit692@gmail.com>"
+description: "A sandbox and package manager application for Linux."
+vendor: "Fencd"
+homepage: "https://github.com/Ankit-692/fencd"
+license: "MIT"
+
+contents:
+  - src: ./build/bin/fencd
+    dst: /usr/bin/fencd
+  - src: ./build/appicon.png
+    dst: /usr/share/pixmaps/fencd.png
+  - src: ./build/fencd.desktop
+    dst: /usr/share/applications/fencd.desktop
+
+depends:
+  - flatpak
+  - bubblewrap
+  - snapd
+
+overrides:
+  deb:
+    depends:
+      - libgtk-3-0
+      # Provide an OR option since newer Ubuntu/Debian use 4.1, while older use 4.0
+      - libwebkit2gtk-4.1-0 | libwebkit2gtk-4.0-37
+
+  rpm:
+    depends:
+      - gtk3
+      - webkit2gtk4.1 # Used in modern Fedora

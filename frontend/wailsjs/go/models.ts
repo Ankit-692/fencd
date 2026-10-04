@@ -1,4 +1,4 @@
-export namespace core {
+export namespace models {
 	
 	export class Permissions {
 	    network: boolean;

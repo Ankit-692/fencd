@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import './App.css';
 import { Shield, Plus } from 'lucide-react';
 import { GetApps, TogglePermission, AddNativeApp, LaunchApp, SelectExecutable, RemoveNativeApp } from '../wailsjs/go/core/App';
-import { core } from '../wailsjs/go/models'; import { Sidebar } from './components/Sidebar';
+import { models } from '../wailsjs/go/models'; import { Sidebar } from './components/Sidebar';
 import { AppCard } from './components/AppCard';
 import { AddAppModal } from './components/AddAppModal';
 import { SystemAppsModal } from './components/SystemAppsModal';
@@ -11,7 +11,7 @@ export type TabType = 'All' | 'Flatpak' | 'Snap' | 'Native';
 
 function App() {
   const [activeTab, setActiveTab] = useState<TabType>('All');
-  const [apps, setApps] = useState<core.AppModel[]>([]);
+  const [apps, setApps] = useState<models.AppModel[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
@@ -19,7 +19,6 @@ function App() {
   const [showSystemAppsModal, setShowSystemAppsModal] = useState(false);
   const [pendingExecPath, setPendingExecPath] = useState('');
   const [newAppName, setNewAppName] = useState('');
-  const [newAppIcon, setNewAppIcon] = useState('');
   const [launchingAppId, setLaunchingAppId] = useState<string | null>(null);
 
   const [confirmDialog, setConfirmDialog] = useState<{ message: string, onConfirm: () => void } | null>(null);
@@ -45,7 +44,7 @@ function App() {
 
   const filteredApps = apps.filter(app => activeTab === 'All' || app.type === activeTab);
 
-  const handleTogglePermission = async (appId: string, appType: string, perm: keyof core.Permissions, currentVal: boolean) => {
+  const handleTogglePermission = async (appId: string, appType: string, perm: keyof models.Permissions, currentVal: boolean) => {
     // Optimistically update UI
     setApps(apps.map(app => {
       if (app.id === appId) {
@@ -62,7 +61,7 @@ function App() {
         return {
           ...app,
           permissions: updatedPerms
-        } as core.AppModel;
+        } as models.AppModel;
       }
       return app;
     }));
@@ -86,7 +85,7 @@ function App() {
           return {
             ...app,
             permissions: revertedPerms
-          } as core.AppModel;
+          } as models.AppModel;
         }
         return app;
       }));
@@ -100,15 +99,14 @@ function App() {
 
     setPendingExecPath(execPath);
     setNewAppName('');
-    setNewAppIcon('');
     setShowModal(true);
   };
 
   const confirmAddApp = async () => {
     if (!newAppName.trim()) return;
 
+    const success = await AddNativeApp(newAppName, pendingExecPath, "");
     setShowModal(false);
-    const success = await AddNativeApp(newAppName, pendingExecPath, newAppIcon);
     if (success) {
       fetchApps();
     } else {
@@ -160,7 +158,7 @@ function App() {
               <button className="add-app-btn" onClick={() => setShowSystemAppsModal(true)}>
                 <Plus size={18} /> Installed Apps
               </button>
-              <button className="add-app-btn" onClick={handleAddNativeApp} style={{ background: 'var(--bg-card)' }}>
+              <button className="secondary-btn" onClick={handleAddNativeApp}>
                 <Plus size={18} /> Add Custom / AppImages
               </button>
             </div>
@@ -184,7 +182,15 @@ function App() {
           <div>
             {activeTab === 'All' && "Manage all your applications from one dashboard. Permissions behave slightly differently based on the packaging format."}
             {(activeTab === 'Flatpak' || activeTab === 'Snap') && "These permissions apply system-wide. If the app is currently running, please restart it for the new permissions to take effect."}
-            {activeTab === 'Native' && "Fencd actively sandboxes these apps. You must launch them from Fencd to apply these restrictions. You can create desktop shortcuts later to automate this."}
+            {activeTab === 'Native' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <strong style={{ color: 'var(--text-primary)' }}>Fencd actively sandboxes these applications.</strong>
+                <ul style={{ margin: 0, paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '0.25rem' }}>
+                  <li>Launch the app directly from here, or create a shortcut with your configured permissions.</li>
+                  <li><strong>Important:</strong> After changing permissions, you must restart the app and recreate its shortcut to apply changes.</li>
+                </ul>
+              </div>
+            )}
           </div>
         </div>
 
@@ -216,8 +222,6 @@ function App() {
           pendingExecPath={pendingExecPath}
           newAppName={newAppName}
           setNewAppName={setNewAppName}
-          newAppIcon={newAppIcon}
-          setNewAppIcon={setNewAppIcon}
           confirmAddApp={confirmAddApp}
           setShowModal={setShowModal}
         />

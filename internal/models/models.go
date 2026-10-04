@@ -1,4 +1,4 @@
-package core
+package models
 
 type Permissions struct {
 	Network        bool `json:"network"`

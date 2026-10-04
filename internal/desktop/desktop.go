@@ -1,4 +1,4 @@
-package core
+package desktop
 
 import (
 	"bufio"
@@ -8,17 +8,19 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"fencd/internal/models"
 )
 
 // GetSystemApps reads installed applications from desktop files
-func (a *App) GetSystemApps() []SystemApp {
+func GetSystemApps() []models.SystemApp {
 	home, _ := os.UserHomeDir()
 	dirs := []string{
 		"/usr/share/applications",
 		filepath.Join(home, ".local", "share", "applications"),
 	}
 
-	var apps []SystemApp
+	var apps []models.SystemApp
 	seen := make(map[string]bool)
 
 	for _, dir := range dirs {
@@ -42,15 +44,15 @@ func (a *App) GetSystemApps() []SystemApp {
 	return apps
 }
 
-func parseDesktopFile(path string) (SystemApp, bool) {
+func parseDesktopFile(path string) (models.SystemApp, bool) {
 	file, err := os.Open(path)
 	if err != nil {
-		return SystemApp{}, false
+		return models.SystemApp{}, false
 	}
 	defer file.Close()
 
 	scanner := bufio.NewScanner(file)
-	var app SystemApp
+	var app models.SystemApp
 	isApp := false
 	inDesktopEntry := false
 
@@ -73,9 +75,9 @@ func parseDesktopFile(path string) (SystemApp, bool) {
 			} else if strings.HasPrefix(line, "Name=") && app.Name == "" {
 				app.Name = strings.TrimPrefix(line, "Name=")
 			} else if strings.HasPrefix(line, "Exec=") && app.ExecPath == "" {
-				exec := strings.TrimPrefix(line, "Exec=")
+				execCmd := strings.TrimPrefix(line, "Exec=")
 				// Handle arguments like %u, %F, quotes, etc
-				parts := strings.Fields(exec)
+				parts := strings.Fields(execCmd)
 				if len(parts) > 0 {
 					// We take the first part, removing quotes if present
 					execPath := strings.Trim(parts[0], "\"")
@@ -94,7 +96,7 @@ func parseDesktopFile(path string) (SystemApp, bool) {
 		}
 		return app, true
 	}
-	return SystemApp{}, false
+	return models.SystemApp{}, false
 }
 
 func resolveIconToBase64(iconStr string) string {

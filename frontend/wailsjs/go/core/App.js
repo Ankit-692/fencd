@@ -22,20 +22,12 @@ export function LaunchApp(arg1, arg2) {
   return window['go']['core']['App']['LaunchApp'](arg1, arg2);
 }
 
-export function LaunchNativeApp(arg1) {
-  return window['go']['core']['App']['LaunchNativeApp'](arg1);
-}
-
 export function RemoveNativeApp(arg1) {
   return window['go']['core']['App']['RemoveNativeApp'](arg1);
 }
 
 export function SelectExecutable() {
   return window['go']['core']['App']['SelectExecutable']();
-}
-
-export function SelectIcon() {
-  return window['go']['core']['App']['SelectIcon']();
 }
 
 export function TogglePermission(arg1, arg2, arg3, arg4) {

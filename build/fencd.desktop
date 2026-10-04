@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Fencd
+Comment=Sandbox and package manager for Linux
+Exec=/usr/bin/fencd %U
+Icon=fencd
+Terminal=false
+Type=Application
+Categories=System;Utility;
