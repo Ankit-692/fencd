@@ -114,13 +114,20 @@ func RemoveNativeApp(appID string) bool {
 
 // getBwrapArgs generates the bubblewrap arguments for a given app
 func getBwrapArgs(targetApp *models.AppModel) []string {
-	args := []string{
-		"--ro-bind", "/", "/", // Base filesystem is read-only
+	args := []string{}
+
+	if targetApp.Permissions.FSHost {
+		args = append(args, "--bind", "/", "/")
+	} else {
+		args = append(args, "--ro-bind", "/", "/")
+	}
+
+	args = append(args,
 		"--dev", "/dev",
 		"--proc", "/proc",
 		"--bind", "/tmp", "/tmp", // tmp must be writable for apps to function
-		"--tmpfs", "/dev/shm", // Chromium IPC requires a writable /dev/shm
-	}
+		"--tmpfs", "/dev/shm",    // Chromium IPC requires a writable /dev/shm
+	)
 
 	if targetApp.Permissions.DBus {
 		args = append(args, "--bind", "/run", "/run") // run is often needed for sockets/DBus
@@ -164,14 +171,13 @@ func getBwrapArgs(targetApp *models.AppModel) []string {
 	// Filesystem
 	home, _ := os.UserHomeDir()
 
-	if targetApp.Permissions.FSHost {
-		// If they want host write access, we bind / read-write
-		args = append(args, "--bind", "/", "/")
-	} else if targetApp.Permissions.FSHome {
-		args = append(args, "--bind", home, home)
-	} else {
-		// Create a tmpfs on home by default to block access
-		args = append(args, "--tmpfs", home)
+	if !targetApp.Permissions.FSHost {
+		if targetApp.Permissions.FSHome {
+			args = append(args, "--bind", home, home)
+		} else {
+			// Create a tmpfs on home by default to block access
+			args = append(args, "--tmpfs", home)
+		}
 	}
 
 	if targetApp.Permissions.AudioOutput {
