@@ -44,7 +44,7 @@ By leveraging [Bubblewrap (`bwrap`)](https://github.com/containers/bubblewrap), 
 
 <div align="center">
 
-<img src="screenshots/dashboard.png" width="400" alt="Dashboard" />
+<img src="screenshots/dashboard.png" width="800" alt="Dashboard" />
 
 </div>
 
